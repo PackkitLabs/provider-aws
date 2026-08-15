@@ -1,0 +1,162 @@
+{
+	"$schema": "https://packkitlabs.github.io/create-packkit-js/packkit.schema.json",
+	"generator": "create-packkit",
+	"version": "4.3.3",
+	"preset": "ts-lib",
+	"settings": {
+		"description": "AWS deployment provider for Packkit-generated projects — consumes a project's deployment contract to emit OpenTofu/Terraform and a GitHub-OIDC deploy pipeline, language-agnostically.",
+		"author": "DanMat <dannymatthew@gmail.com>",
+		"repo": "https://github.com/PackkitLabs/provider-aws",
+		"pkgChecks": true,
+		"workflows": ["ci"]
+	},
+	"baseline": {
+		"schemaVersion": 1,
+		"files": {
+			".changeset/README.md": {
+				"hash": "0e16f282026359"
+			},
+			".changeset/config.json": {
+				"hash": "0bdf81bc9e9c2e"
+			},
+			".editorconfig": {
+				"hash": "1811c495930b03"
+			},
+			".github/ISSUE_TEMPLATE/bug_report.md": {
+				"hash": "14665755d4fe69"
+			},
+			".github/ISSUE_TEMPLATE/feature_request.md": {
+				"hash": "19ef8d724b4866"
+			},
+			".github/PULL_REQUEST_TEMPLATE.md": {
+				"hash": "174297edf0cebd"
+			},
+			".github/renovate.json": {
+				"hash": "0ae9c2290044dd"
+			},
+			".github/workflows/ci.yml": {
+				"hash": "0b6f850aba9057"
+			},
+			".gitignore": {
+				"hash": "1fd9c31aebe75a"
+			},
+			".npmrc": {
+				"hash": "154fbd08123dcc"
+			},
+			".nvmrc": {
+				"hash": "147aa9099b1835"
+			},
+			".prettierignore": {
+				"hash": "0a0c87fb2713ab"
+			},
+			".prettierrc.json": {
+				"hash": "05a19eb6a83b83"
+			},
+			".vscode/extensions.json": {
+				"hash": "151dd68be63661"
+			},
+			".vscode/settings.json": {
+				"hash": "0620abb8210f6f"
+			},
+			"AGENTS.md": {
+				"hash": "085bffc523bfe1"
+			},
+			"CLAUDE.md": {
+				"hash": "0a3e1dac8414fa"
+			},
+			"CODE_OF_CONDUCT.md": {
+				"hash": "11130d8e94d7e7"
+			},
+			"CONTRIBUTING.md": {
+				"hash": "1d9fdf181456f9"
+			},
+			"LICENSE": {
+				"hash": "169f1ff468787d"
+			},
+			"README.md": {
+				"hash": "05955d481da9b3"
+			},
+			"SECURITY.md": {
+				"hash": "1fc69ca4db19fc"
+			},
+			"eslint.config.js": {
+				"hash": "0cb9cb0c88541d"
+			},
+			"package.json": {
+				"hash": "1255b5fb3d98ed"
+			},
+			"src/index.test.ts": {
+				"hash": "15fa0f3fc10ecd"
+			},
+			"src/index.ts": {
+				"hash": "05e62c94a9b54f"
+			},
+			"tsconfig.json": {
+				"hash": "1b80b087e26b53"
+			},
+			"tsup.config.ts": {
+				"hash": "058521d29808bb"
+			},
+			"vitest.config.ts": {
+				"hash": "1073146c34a5d4"
+			}
+		},
+		"packageJson": {
+			"scripts": {
+				"typecheck": "tsc --noEmit",
+				"build": "tsup",
+				"dev": "tsup --watch",
+				"prepublishOnly": "tsup",
+				"clean": "rimraf dist",
+				"test": "vitest run",
+				"test:watch": "vitest",
+				"coverage": "vitest run --coverage",
+				"format": "prettier --write .",
+				"format:check": "prettier --check .",
+				"lint": "eslint .",
+				"lint:fix": "eslint . --fix",
+				"prepare": "simple-git-hooks",
+				"changeset": "changeset",
+				"version": "changeset version",
+				"release": "npm run build && changeset publish",
+				"check:pkg": "publint && attw --pack --profile esm-only"
+			},
+			"dependencies": {
+				"devDependencies": {
+					"@arethetypeswrong/cli": "^0.18.0",
+					"@changesets/cli": "^2.27.0",
+					"@eslint/js": "^10.0.0",
+					"@types/node": "^24.0.0",
+					"@vitest/coverage-v8": "^4.0.0",
+					"eslint": "^10.0.0",
+					"lint-staged": "^16.2.0",
+					"prettier": "^3.3.0",
+					"publint": "^0.3.0",
+					"rimraf": "^6.0.0",
+					"simple-git-hooks": "^2.11.0",
+					"tsup": "^8.0.0",
+					"typescript": "^5.9.3",
+					"typescript-eslint": "^8.0.0",
+					"vitest": "^4.0.0"
+				}
+			},
+			"protectedFields": {
+				"exports": {
+					".": {
+						"import": {
+							"types": "./dist/index.d.ts",
+							"default": "./dist/index.js"
+						}
+					}
+				},
+				"main": "./dist/index.js",
+				"module": "./dist/index.js",
+				"types": "./dist/index.d.ts",
+				"files": ["dist", "src"],
+				"engines": {
+					"node": ">=24.0.0"
+				}
+			}
+		}
+	}
+}
