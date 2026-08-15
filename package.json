@@ -1,6 +1,6 @@
 {
 	"name": "@packkit/provider-aws",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "AWS deployment provider for Packkit-generated projects — consumes a project's deployment contract to emit OpenTofu/Terraform and a GitHub-OIDC deploy pipeline, language-agnostically.",
 	"homepage": "https://github.com/PackkitLabs/provider-aws#readme",
 	"bugs": {
