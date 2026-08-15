@@ -1,0 +1,40 @@
+name: Release
+
+# Changesets-driven release. On every push to main:
+#   • if unreleased changesets exist → open/update a "Version Packages" PR that runs
+#     `changeset version` (bumps package.json + writes the CHANGELOG entry);
+#   • if none remain (that PR was merged) → run `changeset publish` to publish.
+#
+# Publishing uses npm OIDC Trusted Publishing — NO NPM_TOKEN, provenance automatic.
+# @packkit/provider-aws is scoped, so publishConfig.access=public (package.json)
+# is required. The trusted publisher must be configured on npmjs.com for the package
+# → PackkitLabs/provider-aws, workflow file "release.yml".
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write # open the Version Packages PR / push the version bump
+  pull-requests: write # open the Version Packages PR
+  id-token: write # OIDC trusted publishing
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm install -g npm@^11.5.1 # OIDC trusted publishing needs npm >= 11.5.1
+      - run: npm ci
+      # action v1.x pairs with @changesets/cli v2 (installed here); action v2 requires CLI v3.
+      - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        with:
+          version: npm run version # changeset version
+          publish: npm run release # npm run build && changeset publish (OIDC, tokenless)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

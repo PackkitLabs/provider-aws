@@ -1,0 +1,90 @@
+{
+	"name": "@packkit/provider-aws",
+	"version": "0.1.0",
+	"description": "AWS deployment provider for Packkit-generated projects — consumes a project's deployment contract to emit OpenTofu/Terraform and a GitHub-OIDC deploy pipeline, language-agnostically.",
+	"homepage": "https://github.com/PackkitLabs/provider-aws#readme",
+	"bugs": {
+		"url": "https://github.com/PackkitLabs/provider-aws/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PackkitLabs/provider-aws.git"
+	},
+	"license": "MIT",
+	"author": "DanMat <dannymatthew@gmail.com>",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			}
+		}
+	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"src"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"prepublishOnly": "tsup",
+		"clean": "rimraf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"coverage": "vitest run --coverage",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"prepare": "simple-git-hooks",
+		"changeset": "changeset",
+		"version": "changeset version",
+		"release": "npm run build && changeset publish",
+		"check:pkg": "publint && attw --pack --profile esm-only",
+		"check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run check:pkg",
+		"test:integration": "npm run build && node scripts/validate-terraform.mjs"
+	},
+	"simple-git-hooks": {
+		"pre-commit": "npx lint-staged"
+	},
+	"lint-staged": {
+		"*.{js,ts}": [
+			"prettier --write",
+			"eslint --fix"
+		],
+		"*.{json,md,yml}": "prettier --write"
+	},
+	"devDependencies": {
+		"@arethetypeswrong/cli": "^0.18.0",
+		"@changesets/cli": "^2.27.0",
+		"@eslint/js": "^10.0.0",
+		"@packkit/core": "^0.4.0",
+		"@types/node": "^24.0.0",
+		"@vitest/coverage-v8": "^4.0.0",
+		"eslint": "^10.0.0",
+		"globals": "^17.11.0",
+		"lint-staged": "^16.2.0",
+		"prettier": "^3.3.0",
+		"publint": "^0.3.0",
+		"rimraf": "^6.0.0",
+		"simple-git-hooks": "^2.11.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.0.0",
+		"vitest": "^4.0.0"
+	},
+	"peerDependencies": {
+		"@packkit/core": "^0.4.0"
+	}
+}
