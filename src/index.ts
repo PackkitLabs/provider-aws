@@ -1,3 +1,4 @@
+import type { ProviderCapability } from '@packkit/core';
 import { supports } from './supports.js';
 import { prepare } from './prepare.js';
 import { plan } from './plan.js';
@@ -5,6 +6,7 @@ import { AwsProviderError } from './errors.js';
 
 export { supports, prepare, plan, AwsProviderError };
 export { awsName, resolveOptions } from './options.js';
+export { PLAN_SCHEMA_VERSION } from './plan.js';
 export type * from './types.js';
 
 // A provider is `provider × DeploymentContract`, never `provider × language`: the
@@ -18,11 +20,14 @@ export type * from './types.js';
 // bound to an injected `tofu` runner can be added the same way provider-netlify
 // injects its client.
 export interface AwsProvider {
+	id: 'aws';
+	/** No runtime `apply` — the emitted pipeline deploys. Only `plan` is advertised. */
+	capabilities: ProviderCapability[];
 	supports: typeof supports;
 	prepare: typeof prepare;
 	plan: typeof plan;
 }
 
 export function createAwsProvider(): AwsProvider {
-	return { supports, prepare, plan };
+	return { id: 'aws', capabilities: ['plan'], supports, prepare, plan };
 }

@@ -4,6 +4,9 @@ import { resolveOptions } from './options.js';
 import { resolveArchetype } from './archetype.js';
 import { prepare } from './prepare.js';
 
+/** Bump when the plan shape changes. */
+export const PLAN_SCHEMA_VERSION = 1;
+
 // Pure: a deterministic, human-auditable description of what applying the emitted
 // infra creates — the files plus a plain-language resource list — without touching
 // AWS. Same inputs → identical plan. Actual provisioning is `tofu apply`, run by the
@@ -22,6 +25,7 @@ export function plan({
 
 	return {
 		provider: 'aws',
+		schemaVersion: PLAN_SCHEMA_VERSION,
 		archetype,
 		region: opts.region,
 		name: opts.name,

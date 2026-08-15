@@ -126,6 +126,8 @@ export interface WorkerView {
 
 export interface AwsPlan {
 	provider: 'aws';
+	/** Plan schema version, so a host can persist and evolve the shape. */
+	schemaVersion: number;
 	archetype: AwsArchetype;
 	region: string;
 	name: string;
