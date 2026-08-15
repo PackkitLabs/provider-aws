@@ -122,9 +122,20 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
 # --- GitHub Actions OIDC -> IAM deploy role (no long-lived keys) ---
 
 resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+
+  # AWS has managed GitHub's OIDC certificate chain since 2023, so no thumbprint is
+  # required — and pinning one causes perpetual drift (AWS repopulates the list) and
+  # a future outage when GitHub rotates its certificate. Let AWS own it.
+  lifecycle {
+    ignore_changes = [thumbprint_list]
+  }
+}
+
+locals {
+  github_owner = split("/", var.github_repository)[0]
+  github_repo  = split("/", var.github_repository)[1]
 }
 
 data "aws_iam_policy_document" "trust" {
@@ -143,12 +154,19 @@ data "aws_iam_policy_document" "trust" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Scope to this repository. Any ref may assume the role (plan on PRs); the
-    # workflow itself gates apply to the default branch.
+    # Scope to this repository. Match BOTH subject formats: the legacy
+    # "repo:owner/name:*" and the immutable "repo:owner@<id>/name@<id>:*" that GitHub
+    # emits for repositories created/renamed after 2026-07-15 (the numeric ids don't
+    # exist at scaffold time, so they're wildcarded). The owner and repo *names* are
+    # anchored — each is followed by a literal "@" or "/" — so "\${owner}evil" can
+    # never match. Any ref may assume the role (plan on PRs); the workflow gates apply.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:\${var.github_repository}:*"]
+      values = [
+        "repo:\${var.github_repository}:*",
+        "repo:\${local.github_owner}@*/\${local.github_repo}@*:*",
+      ]
     }
   }
 }

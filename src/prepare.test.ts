@@ -102,6 +102,20 @@ describe('prepare', () => {
 		expect(bootstrap).toContain('repo:${var.github_repository}:*'); // trust scoped to the repo
 	});
 
+	it('OIDC trust matches immutable subject claims and does not pin a thumbprint', () => {
+		const bootstrap = prepare({ project: projectWith(staticContract), options: opts }).files[
+			'infra/bootstrap/main.tf'
+		];
+		// Immutable subject format (repos created/renamed after 2026-07-15): owner@<id>/repo@<id>.
+		// The '@' can't appear in a GitHub name, so its presence in the sub condition is the tell.
+		expect(bootstrap).toContain('@*/');
+		expect(bootstrap).toContain('repo:${local.github_owner}@*/${local.github_repo}@*:*');
+		expect(bootstrap).toContain('repo:${var.github_repository}:*'); // legacy format still accepted
+		// AWS manages GitHub's cert chain — no pinned thumbprint, and drift is suppressed.
+		expect(bootstrap).not.toMatch(/thumbprint_list\s*=\s*\[/);
+		expect(bootstrap).toContain('ignore_changes = [thumbprint_list]');
+	});
+
 	it('bakes the repository into the bootstrap variable default when provided', () => {
 		const { files } = prepare({ project: projectWith(staticContract), options: opts });
 		expect(files['infra/bootstrap/variables.tf']).toContain('default     = "PackkitLabs/demo"');
