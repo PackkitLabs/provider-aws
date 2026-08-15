@@ -11,12 +11,40 @@ export interface StaticDeploymentContract {
 	outputDirectory: string;
 }
 
-/** Any `@packkit/core` deployment contract a host may hand us; only 'static' is
- *  supported in 0.1.0, the rest are reported unsupported. */
+/** The language-neutral service/worker contract fields this provider reads. Ports
+ *  and health paths come straight from `@packkit/core`'s contract — never inferred. */
+export interface ServiceDeploymentContract {
+	type: 'service';
+	runtime: string;
+	startCommand: string;
+	defaultPort: number;
+	portEnvironmentVariable: string;
+	healthCheckPath: string;
+	requiredEnvironmentVariables?: string[];
+	optionalEnvironmentVariables?: string[];
+}
+
+export interface WorkerDeploymentContract {
+	type: 'worker';
+	runtime: string;
+	startCommand: string;
+	requiredEnvironmentVariables?: string[];
+	optionalEnvironmentVariables?: string[];
+}
+
+/** Any `@packkit/core` deployment contract a host may hand us. Fields beyond `type`
+ *  are optional so an unrecognized contract from a newer generator is reported
+ *  unsupported, never a type error. */
 export interface DeploymentContractLike {
 	type: string;
 	buildCommand?: string;
 	outputDirectory?: string;
+	runtime?: string;
+	defaultPort?: number;
+	portEnvironmentVariable?: string;
+	healthCheckPath?: string;
+	requiredEnvironmentVariables?: string[];
+	optionalEnvironmentVariables?: string[];
 	[key: string]: unknown;
 }
 
@@ -76,8 +104,25 @@ export interface PrepareResult {
 }
 
 /** The deploy archetype the emitted infra implements — the AWS shape a contract
- *  maps to. Only `static-site` in 0.1.0. */
-export type AwsArchetype = 'static-site';
+ *  maps to. `static` → CloudFront/S3, `service` → App Runner, `worker` → ECS Fargate. */
+export type AwsArchetype = 'static-site' | 'service' | 'worker';
+
+/** The provider-neutral fields read off a service contract, normalized. */
+export interface ServiceView {
+	port: number;
+	portEnv: string;
+	healthCheckPath: string;
+	requiredEnv: string[];
+	optionalEnv: string[];
+	runtime: string;
+}
+
+/** The provider-neutral fields read off a worker contract, normalized. */
+export interface WorkerView {
+	requiredEnv: string[];
+	optionalEnv: string[];
+	runtime: string;
+}
 
 export interface AwsPlan {
 	provider: 'aws';

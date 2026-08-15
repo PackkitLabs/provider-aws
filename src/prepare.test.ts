@@ -33,10 +33,40 @@ describe('prepare', () => {
 		);
 	});
 
-	it('throws a typed error for a non-static contract', () => {
-		expect(() => prepare({ project: projectWith({ type: 'service' }), options: opts })).toThrow(
+	it('throws a typed error for a non-deployable contract', () => {
+		expect(() => prepare({ project: projectWith({ type: 'library' }), options: opts })).toThrow(
 			AwsProviderError,
 		);
+	});
+
+	it('emits App Runner infra for a service contract', () => {
+		const service = {
+			type: 'service',
+			runtime: 'node',
+			defaultPort: 8080,
+			portEnvironmentVariable: 'PORT',
+			healthCheckPath: '/healthz',
+		};
+		const { files } = prepare({ project: projectWith(service), options: opts });
+		expect(files['infra/ecr.tf']).toContain('aws_ecr_repository');
+		expect(files['infra/main.tf']).toContain('aws_apprunner_service');
+		expect(files['infra/main.tf']).toContain('path                = "/healthz"');
+		expect(files['infra/main.tf']).not.toContain('aws_nat_gateway'); // no NAT cost trap
+		expect(files['.github/workflows/deploy.yml']).toContain('docker push');
+	});
+
+	it('emits ECS Fargate infra (no NAT) for a worker contract', () => {
+		const worker = {
+			type: 'worker',
+			runtime: 'python-3.12',
+			requiredEnvironmentVariables: ['QUEUE_URL'],
+		};
+		const { files } = prepare({ project: projectWith(worker), options: opts });
+		expect(files['infra/main.tf']).toContain('aws_ecs_service');
+		expect(files['infra/network.tf']).toContain('aws_internet_gateway');
+		expect(files['infra/network.tf']).not.toContain('aws_nat_gateway'); // public subnets, no NAT
+		expect(files['infra/main.tf']).toContain('retention_in_days = 30'); // explicit log retention
+		expect(files['infra/bootstrap/main.tf']).toContain('ecs:*'); // deploy role scoped to archetype
 	});
 
 	it('reads only the contract — extra project fields never change the output', () => {

@@ -33,8 +33,26 @@ describe('plan', () => {
 		).toThrow(AwsProviderError);
 	});
 
-	it('rejects an unsupported contract', () => {
-		expect(() => plan({ project: projectWith({ type: 'worker' }), options: opts })).toThrow(
+	it('reports the archetype per contract type', () => {
+		const svc = plan({
+			project: projectWith({
+				type: 'service',
+				runtime: 'node',
+				defaultPort: 8080,
+				healthCheckPath: '/h',
+			}),
+			options: opts,
+		});
+		expect(svc.archetype).toBe('service');
+		const wrk = plan({
+			project: projectWith({ type: 'worker', runtime: 'go-1.23' }),
+			options: opts,
+		});
+		expect(wrk.archetype).toBe('worker');
+	});
+
+	it('rejects an unsupported (non-deployable) contract', () => {
+		expect(() => plan({ project: projectWith({ type: 'library' }), options: opts })).toThrow(
 			AwsProviderError,
 		);
 	});

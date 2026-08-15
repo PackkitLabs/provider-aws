@@ -6,11 +6,15 @@ import { AwsProviderError } from './errors.js';
 // contract a generator derives — never raw config, frameworks, or the language.
 // Any generator's static contract is supported identically.
 //
-// 0.1.0 supports a single static site (S3 + CloudFront). `service` (Fargate) and
-// `worker` (ECS/Lambda) land in later versions; a `fullstack` contract carries a
-// static frontend + a service backend, but deploying it is a deliberate later
-// decision, so it is reported unsupported rather than half-deployed.
-const SUPPORTED_TYPES: ReadonlySet<string> = new Set<DeploymentType>(['static']);
+// Supported archetypes: `static` (S3 + CloudFront), `service` (App Runner), and
+// `worker` (ECS Fargate). A `fullstack` contract carries a static frontend + a
+// service backend; deploying it is a deliberate later decision, so it is reported
+// unsupported rather than half-deployed. `cli`/`library` are non-deployable.
+const SUPPORTED_TYPES: ReadonlySet<string> = new Set<DeploymentType>([
+	'static',
+	'service',
+	'worker',
+]);
 
 export function supports(contract: DeploymentContractLike | undefined): SupportResult {
 	if (!contract || typeof contract.type !== 'string') {
@@ -19,19 +23,25 @@ export function supports(contract: DeploymentContractLike | undefined): SupportR
 	if (!SUPPORTED_TYPES.has(contract.type)) {
 		return unsupported(
 			'UNSUPPORTED_DEPLOYMENT_TYPE',
-			`The AWS provider (0.1.0) supports only 'static' deployments; got '${contract.type}'.`,
+			`The AWS provider supports 'static', 'service', and 'worker' deployments; got '${contract.type}'.`,
 		);
 	}
-	if (!contract.buildCommand || !contract.outputDirectory) {
+	if (contract.type === 'static' && (!contract.buildCommand || !contract.outputDirectory)) {
 		return unsupported(
 			'INCOMPLETE_STATIC_CONTRACT',
 			'The static contract is missing buildCommand or outputDirectory.',
 		);
 	}
+	if (contract.type === 'service' && typeof contract.defaultPort !== 'number') {
+		return unsupported(
+			'INCOMPLETE_SERVICE_CONTRACT',
+			'The service contract is missing a numeric defaultPort.',
+		);
+	}
 	return { supported: true, reasons: [] };
 }
 
-/** Throw a typed error unless the contract is a supported static site. */
+/** Throw a typed error unless the contract is a supported deployment. */
 export function assertSupported(contract: DeploymentContractLike | undefined): void {
 	const check = supports(contract);
 	if (!check.supported) {

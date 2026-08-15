@@ -1,13 +1,17 @@
-import type { ResolvedAwsOptions } from './types.js';
+import type { AwsArchetype, ResolvedAwsOptions } from './types.js';
 
-// The deploy pipeline: fmt + validate + tflint + plan on PRs, apply on merge to the
+// The deploy pipeline: fmt + lint + validate + plan on PRs, apply on merge to the
 // default branch — authenticating to AWS via GitHub OIDC (assume-role, no stored
-// keys). The role ARN and state bucket come from the bootstrap outputs and are set
-// as repo variables (AWS_DEPLOY_ROLE_ARN / AWS_STATE_BUCKET), so nothing secret is
-// committed. Uses OpenTofu; swap `tofu` for `terraform` if you prefer.
+// keys). The role ARN and state bucket come from the bootstrap outputs, set as repo
+// variables (AWS_DEPLOY_ROLE_ARN / AWS_STATE_BUCKET), so nothing secret is committed.
+// Uses OpenTofu.
+//
+// Static sites apply directly. Container archetypes (service/worker) build and push a
+// Docker image to ECR first — ECR is created on its own so the image can be pushed
+// before the App Runner / ECS resources that reference it exist (the image chicken-
+// and-egg), then the full apply points at the new tag.
 
-export function deployWorkflow(opts: ResolvedAwsOptions): string {
-	return `name: Deploy (AWS)
+const HEADER = (region: string) => `name: Deploy (AWS)
 
 on:
   push:
@@ -22,7 +26,7 @@ permissions:
 concurrency: deploy-\${{ github.ref }}
 
 env:
-  AWS_REGION: ${opts.region}
+  AWS_REGION: ${region}
 
 jobs:
   terraform:
@@ -59,11 +63,45 @@ jobs:
       - name: Plan
         if: github.event_name == 'pull_request'
         run: tofu plan -no-color -input=false
+`;
+
+const APPLY_GUARD = "if: github.event_name == 'push' && github.ref == 'refs/heads/main'";
+
+const staticApply = `
+      - name: Apply
+        ${APPLY_GUARD}
+        run: tofu apply -auto-approve -input=false
+
+      - name: Publish site
+        ${APPLY_GUARD}
+        run: |
+          # TODO: build your site, then sync it to the bucket and invalidate the CDN:
+          #   aws s3 sync ../<build-output>/ "s3://$(tofu output -raw bucket_name)/" --delete
+          #   aws cloudfront create-invalidation --distribution-id "$(tofu output -raw distribution_id)" --paths '/*'
+          echo "Wire your build output into this step (see infra/README.md)."
+`;
+
+const containerApply = `
+      - name: Ensure ECR exists
+        ${APPLY_GUARD}
+        run: tofu apply -auto-approve -input=false -target=aws_ecr_repository.app
+
+      - name: Build & push image
+        ${APPLY_GUARD}
+        run: |
+          ECR="$(tofu output -raw ecr_repository_url)"
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "\${ECR%/*}"
+          docker build -t "$ECR:$GITHUB_SHA" ..
+          docker push "$ECR:$GITHUB_SHA"
 
       - name: Apply
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: tofu apply -auto-approve -input=false
+        ${APPLY_GUARD}
+        run: tofu apply -auto-approve -input=false -var="image_tag=$GITHUB_SHA"
 `;
+
+export function deployWorkflow(opts: ResolvedAwsOptions, archetype: AwsArchetype): string {
+	const apply = archetype === 'static-site' ? staticApply : containerApply;
+	return HEADER(opts.region) + apply;
 }
 
 export function tflintConfig(): string {

@@ -56,16 +56,26 @@ const { files } = prepare({
 
 ## What it emits
 
-- **`infra/`** — a static site: a private, versioned, AES256 **S3** bucket fronted by
-  **CloudFront** via Origin Access Control (HTTPS, SPA fallbacks, cheapest edge tier).
-  S3 backend with **native state locking** (`use_lockfile` — no DynamoDB table).
-- **`infra/bootstrap/`** — run once by a human: the Terraform **state bucket**, the
-  **GitHub OIDC provider**, and a **repo-scoped IAM deploy role**. Solves both
-  chicken-and-eggs (state store and CI credentials must exist before anything can deploy).
-- **`.github/workflows/deploy.yml`** — `fmt → lint → validate → plan` on PRs, `apply` on
-  merge, authenticating via OIDC (no stored keys).
+Three archetypes, one per deployment-contract type — all cost-conscious by construction:
 
-Every generated project is **`tofu fmt`-clean and `tofu validate`-clean**; CI proves it.
+- **`static`** → a private, versioned, AES256 **S3** bucket behind **CloudFront** (OAC,
+  HTTPS, SPA fallbacks, cheapest edge tier).
+- **`service`** → **AWS App Runner** (managed HTTPS + autoscaling, health check on the
+  contract's path, image from ECR) — **no VPC, no NAT gateway, no load balancer**.
+- **`worker`** → **ECS Fargate** (one task, egress-only) on a minimal VPC with **public
+  subnets and no NAT gateway**, logs with explicit 30-day retention.
+
+Plus, for every archetype:
+
+- **`infra/bootstrap/`** — run once by a human: the Terraform **state bucket**, the
+  **GitHub OIDC provider**, and a **repo-scoped IAM deploy role** (permissions scoped to
+  the archetype). Solves both chicken-and-eggs.
+- **`.github/workflows/deploy.yml`** — `fmt → lint → validate → plan` on PRs, `apply` on
+  merge via OIDC (container archetypes build+push the image to ECR first).
+- S3 backend with **native state locking** (`use_lockfile`) — **no DynamoDB table**.
+
+Every generated project is **`tofu fmt`-clean and `tofu validate`-clean**; CI proves it
+across all three archetypes.
 
 ## Design
 
@@ -80,9 +90,11 @@ Every generated project is **`tofu fmt`-clean and `tofu validate`-clean**; CI pr
 
 ## Scope
 
-**0.1.0** — `static` sites only (S3 + CloudFront). `service` (Fargate + ALB) and `worker`
-(ECS/Lambda) are the roadmap — the same contract that generalized across languages maps
-cleanly to those AWS primitives. Unsupported contract types are reported, not guessed.
+**0.1.0** — `static` (S3 + CloudFront), `service` (App Runner), and `worker` (ECS
+Fargate). The same language-neutral contract that generalized across generators maps
+cleanly onto these AWS primitives, so a Node, Python, or Go service deploys identically.
+`fullstack` and a runtime `apply()` (bound to an injected `tofu` runner) are the roadmap;
+unsupported contract types are reported, not guessed.
 
 ## License
 

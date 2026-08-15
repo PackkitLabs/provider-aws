@@ -12,8 +12,16 @@ describe('supports', () => {
 		expect(supports(undefined).reasons[0]?.code).toBe('MISSING_DEPLOYMENT_CONTRACT');
 	});
 
-	it('reports every non-static deployment type as unsupported (0.1.0)', () => {
-		for (const type of ['service', 'worker', 'fullstack', 'cli', 'library']) {
+	it('accepts service and worker contracts', () => {
+		expect(
+			supports({ type: 'service', runtime: 'node', defaultPort: 8080, healthCheckPath: '/healthz' })
+				.supported,
+		).toBe(true);
+		expect(supports({ type: 'worker', runtime: 'python-3.12' }).supported).toBe(true);
+	});
+
+	it('reports non-deployable / deferred types as unsupported', () => {
+		for (const type of ['fullstack', 'cli', 'library', 'nope']) {
 			const result = supports({ type });
 			expect(result.supported).toBe(false);
 			expect(result.reasons[0]?.code).toBe('UNSUPPORTED_DEPLOYMENT_TYPE');
@@ -27,10 +35,16 @@ describe('supports', () => {
 		);
 	});
 
+	it('reports a service contract missing its port', () => {
+		expect(supports({ type: 'service', runtime: 'node' }).reasons[0]?.code).toBe(
+			'INCOMPLETE_SERVICE_CONTRACT',
+		);
+	});
+
 	it('assertSupported throws a typed error for unsupported input', () => {
-		expect(() => assertSupported({ type: 'service' })).toThrow(AwsProviderError);
+		expect(() => assertSupported({ type: 'library' })).toThrow(AwsProviderError);
 		try {
-			assertSupported({ type: 'service' });
+			assertSupported({ type: 'library' });
 		} catch (err) {
 			expect((err as AwsProviderError).code).toBe('UNSUPPORTED_DEPLOYMENT_TYPE');
 		}

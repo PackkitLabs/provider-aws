@@ -37,7 +37,9 @@ export function backendTf(): string {
 `;
 }
 
-export function variablesTf(opts: ResolvedAwsOptions): string {
+// The name + region variables every archetype shares. Service/worker append their
+// own (e.g. image_tag) to this.
+export function baseVariables(opts: ResolvedAwsOptions): string {
 	return `variable "name" {
   description = "Resource name prefix (lowercase, hyphens)."
   type        = string
@@ -52,9 +54,44 @@ variable "region" {
 `;
 }
 
+export function variablesTf(opts: ResolvedAwsOptions): string {
+	return baseVariables(opts);
+}
+
 export function providerTf(): string {
 	return `provider "aws" {
   region = var.region
+}
+`;
+}
+
+// Shared by service + worker: an ECR repository the CI pipeline pushes the container
+// image to. Untagged images expire so old layers don't accrue storage cost.
+export function ecrTf(): string {
+	return `resource "aws_ecr_repository" "app" {
+  name                 = var.name
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+resource "aws_ecr_lifecycle_policy" "app" {
+  repository = aws_ecr_repository.app.name
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Expire untagged images after 14 days"
+      selection = {
+        tagStatus   = "untagged"
+        countType   = "sinceImagePushed"
+        countUnit   = "days"
+        countNumber = 14
+      }
+      action = { type = "expire" }
+    }]
+  })
 }
 `;
 }

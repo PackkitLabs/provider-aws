@@ -1,4 +1,20 @@
-import type { ResolvedAwsOptions } from './types.js';
+import type { AwsArchetype, ResolvedAwsOptions } from './types.js';
+
+// The AWS service actions the deploy role needs to manage each archetype's infra.
+// Broad within the archetype, on `*`; tighten to specific ARNs for production.
+const INFRA_ACTIONS: Record<AwsArchetype, string[]> = {
+	'static-site': ['s3:*', 'cloudfront:*'],
+	service: ['ecr:*', 'apprunner:*', 'logs:*'],
+	worker: ['ecr:*', 'ecs:*', 'ec2:*', 'logs:*', 'application-autoscaling:*'],
+};
+
+// Service/worker create their own IAM roles (App Runner access role, ECS task roles),
+// so the deploy role must manage roles — but only this project's, scoped by name.
+const NEEDS_ROLE_MANAGEMENT: Record<AwsArchetype, boolean> = {
+	'static-site': false,
+	service: true,
+	worker: true,
+};
 
 // The bootstrap module solves the two chicken-and-eggs the issue called out:
 //   1. the S3 bucket that holds Terraform state must exist before the main config's
@@ -58,7 +74,19 @@ variable "github_branch" {
 `;
 }
 
-export function bootstrapMainTf(): string {
+export function bootstrapMainTf(archetype: AwsArchetype): string {
+	// A second statement scoping IAM role management to this project's own roles.
+	const roleManagement = NEEDS_ROLE_MANAGEMENT[archetype]
+		? `
+  statement {
+    sid       = "ManageProjectRoles"
+    effect    = "Allow"
+    actions   = ["iam:*"]
+    resources = ["arn:aws:iam::*:role/\${var.name}-*", "arn:aws:iam::*:policy/\${var.name}-*"]
+  }
+`
+		: '';
+
 	return `data "aws_caller_identity" "current" {}
 
 # --- Terraform state backend (S3 with native locking, no DynamoDB) ---
@@ -130,7 +158,7 @@ resource "aws_iam_role" "deploy" {
   assume_role_policy = data.aws_iam_policy_document.trust.json
 }
 
-# Permissions to manage the static-site infra + read/write Terraform state.
+# Permissions to manage this archetype's infra + read/write Terraform state.
 # Pragmatic for a template; tighten actions/resources for production.
 data "aws_iam_policy_document" "deploy" {
   statement {
@@ -141,12 +169,12 @@ data "aws_iam_policy_document" "deploy" {
   }
 
   statement {
-    sid       = "SiteInfra"
+    sid       = "Infra"
     effect    = "Allow"
-    actions   = ["s3:*", "cloudfront:*"]
+    actions   = [${INFRA_ACTIONS[archetype].map((a) => `"${a}"`).join(', ')}]
     resources = ["*"]
   }
-}
+${roleManagement}}
 
 resource "aws_iam_role_policy" "deploy" {
   name   = "\${var.name}-deploy"

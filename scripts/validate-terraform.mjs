@@ -8,42 +8,64 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { prepare } from '../dist/index.js';
 
-const project = {
-	deploymentContract: { type: 'static', buildCommand: 'npm run build', outputDirectory: 'dist' },
-};
-const { files } = prepare({
-	project,
-	options: {
-		name: 'sample',
-		region: 'us-east-1',
-		repository: { owner: 'PackkitLabs', name: 'sample' },
+// One contract per archetype — the same checks the generated pipeline runs, across
+// every shape the provider emits.
+const CONTRACTS = {
+	static: { type: 'static', buildCommand: 'npm run build', outputDirectory: 'dist' },
+	service: {
+		type: 'service',
+		runtime: 'node',
+		startCommand: 'node dist/index.js',
+		defaultPort: 8080,
+		portEnvironmentVariable: 'PORT',
+		healthCheckPath: '/healthz',
+		requiredEnvironmentVariables: ['DATABASE_URL'],
+		optionalEnvironmentVariables: ['LOG_LEVEL'],
 	},
-});
+	worker: {
+		type: 'worker',
+		runtime: 'python-3.12',
+		startCommand: 'python -m worker',
+		requiredEnvironmentVariables: ['QUEUE_URL'],
+		optionalEnvironmentVariables: ['WORKER_MAX_ATTEMPTS'],
+	},
+};
 
-const root = mkdtempSync(join(tmpdir(), 'provider-aws-'));
-try {
-	for (const [rel, contents] of Object.entries(files)) {
-		const abs = join(root, rel);
-		mkdirSync(dirname(abs), { recursive: true });
-		writeFileSync(abs, contents);
+const sh = (cmd, args, cwd, root) => {
+	process.stdout.write(`\n$ ${cmd} ${args.join(' ')}   (${cwd.replace(root, '.')})\n`);
+	execFileSync(cmd, args, { cwd, stdio: 'inherit' });
+};
+
+function validate(archetype, contract) {
+	const { files } = prepare({
+		project: { deploymentContract: contract },
+		options: {
+			name: `sample-${archetype}`,
+			region: 'us-east-1',
+			repository: { owner: 'PackkitLabs', name: 'sample' },
+		},
+	});
+	const root = mkdtempSync(join(tmpdir(), `provider-aws-${archetype}-`));
+	try {
+		for (const [rel, contents] of Object.entries(files)) {
+			const abs = join(root, rel);
+			mkdirSync(dirname(abs), { recursive: true });
+			writeFileSync(abs, contents);
+		}
+		console.log(`\n=== ${archetype}: emitted ${Object.keys(files).length} files ===`);
+		sh('tofu', ['fmt', '-check', '-recursive'], join(root, 'infra'), root);
+		for (const dir of ['infra', 'infra/bootstrap']) {
+			const cwd = join(root, dir);
+			sh('tofu', ['init', '-backend=false', '-no-color'], cwd, root);
+			sh('tofu', ['validate', '-no-color'], cwd, root);
+		}
+		console.log(`=== ${archetype}: PASS ===`);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
 	}
-	console.log(`emitted ${Object.keys(files).length} files → ${root}`);
-
-	const sh = (cmd, args, cwd) => {
-		process.stdout.write(`\n$ ${cmd} ${args.join(' ')}   (${cwd.replace(root, '.')})\n`);
-		execFileSync(cmd, args, { cwd, stdio: 'inherit' });
-	};
-
-	// Formatting across the whole tree.
-	sh('tofu', ['fmt', '-check', '-recursive'], join(root, 'infra'));
-
-	// Validate each module (no backend, no provider credentials needed).
-	for (const dir of ['infra', 'infra/bootstrap']) {
-		const cwd = join(root, dir);
-		sh('tofu', ['init', '-backend=false', '-no-color'], cwd);
-		sh('tofu', ['validate', '-no-color'], cwd);
-	}
-	console.log('\n✓ terraform: fmt clean + both modules valid');
-} finally {
-	rmSync(root, { recursive: true, force: true });
 }
+
+for (const [archetype, contract] of Object.entries(CONTRACTS)) {
+	validate(archetype, contract);
+}
+console.log('\n✓ terraform: all archetypes fmt-clean + valid');
